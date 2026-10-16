@@ -5,6 +5,8 @@ import { Platform } from 'react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
 import AlbumList from './screens/AlbumList';
 import AlbumDetails from './screens/AlbumDetails';
+import ArtistDetails from './screens/ArtistDetails';
+import CatalogHome from './screens/CatalogHome';
 import RecordForm from './screens/RecordForm';
 
 const initialAlbums = [
@@ -36,6 +38,7 @@ const initialAlbums = [
 ];
 
 const albumsStorageKey = 'sonora.albums.v1';
+const recentSongsStorageKey = 'sonora.recentSongs.v1';
 
 function loadAlbums() {
   if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return initialAlbums;
@@ -55,11 +58,34 @@ function loadAlbums() {
   }
 }
 
+function loadRecentSongs() {
+  if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return [];
+
+  try {
+    const savedSongs = localStorage.getItem(recentSongsStorageKey);
+    if (!savedSongs) return [];
+
+    const parsedSongs = JSON.parse(savedSongs);
+    if (!Array.isArray(parsedSongs)) {
+      throw new Error('O histórico salvo de músicas não está no formato esperado.');
+    }
+    return parsedSongs.filter((item) => item?.albumId && item?.songId).slice(0, 20);
+  } catch (error) {
+    console.error('Não foi possível carregar o histórico de músicas:', error);
+    return [];
+  }
+}
+
 export default function App() {
   const [albums, setAlbums] = useState(loadAlbums);
+  const [recentSongs, setRecentSongs] = useState(loadRecentSongs);
   const [screen, setScreen] = useState('home');
-  const [selectedGenre, setSelectedGenre] = useState(null);
+  const [homeCategory, setHomeCategory] = useState('albums');
+  const [albumGenre, setAlbumGenre] = useState(null);
+  const [artistGenre, setArtistGenre] = useState(null);
   const [selectedAlbumId, setSelectedAlbumId] = useState(null);
+  const [selectedArtist, setSelectedArtist] = useState(null);
+  const [detailsReturnScreen, setDetailsReturnScreen] = useState('home');
   const [formType, setFormType] = useState('album');
   const [editingId, setEditingId] = useState(null);
   const [formValues, setFormValues] = useState({});
@@ -76,7 +102,17 @@ export default function App() {
     }
   }, [albums]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(recentSongsStorageKey, JSON.stringify(recentSongs));
+    } catch (error) {
+      console.error('Não foi possível salvar o histórico de músicas:', error);
+    }
+  }, [recentSongs]);
+
   const selectedAlbum = albums.find((album) => album.id === selectedAlbumId);
+  const artistAlbums = albums.filter((album) => album.artist === selectedArtist);
 
   const openAlbumForm = (album) => {
     setFormReturnScreen(screen);
@@ -107,6 +143,20 @@ export default function App() {
       ? { title: song.title, duration: song.duration, composer: song.composer ?? '' }
       : { title: '', duration: '', composer: '' });
     setScreen('form');
+  };
+
+  const recordSongClick = (album, song) => {
+    setRecentSongs((current) => [
+      { albumId: album.id, songId: song.id, clickedAt: Date.now() },
+      ...current,
+    ].slice(0, 20));
+  };
+
+  const openSongAlbum = (album, song) => {
+    recordSongClick(album, song);
+    setDetailsReturnScreen(screen === 'artistDetails' ? 'artistDetails' : 'home');
+    setSelectedAlbumId(album.id);
+    setScreen('details');
   };
 
   const saveForm = () => {
@@ -143,6 +193,7 @@ export default function App() {
         const newAlbum = { ...albumData, id: String(Date.now()), songs: [] };
         setAlbums((current) => [newAlbum, ...current]);
         setSelectedAlbumId(newAlbum.id);
+        setDetailsReturnScreen(formReturnScreen);
         setScreen('details');
         return;
       }
@@ -177,13 +228,17 @@ export default function App() {
   const confirmDeletion = () => {
     if (deleteRequest?.type === 'album') {
       setAlbums((current) => current.filter((album) => album.id !== deleteRequest.id));
+      setRecentSongs((current) => current.filter((item) => item.albumId !== deleteRequest.id));
       setSelectedAlbumId(null);
-      setScreen('library');
+      setScreen(detailsReturnScreen);
     } else if (deleteRequest?.type === 'song') {
       setAlbums((current) => current.map((album) => (
         album.id === selectedAlbumId
           ? { ...album, songs: album.songs.filter((song) => song.id !== deleteRequest.id) }
           : album
+      )));
+      setRecentSongs((current) => current.filter((item) => (
+        item.albumId !== selectedAlbumId || item.songId !== deleteRequest.id
       )));
     }
     setDeleteRequest(null);
@@ -234,24 +289,38 @@ export default function App() {
     <>
       <StatusBar style="light" backgroundColor="#111319" />
       {screen === 'home' && (
-        <AlbumList
+        <CatalogHome
           albums={albums}
-          home
-          selectedGenre={selectedGenre}
-          onSelectGenre={setSelectedGenre}
-          onOpenLibrary={() => setScreen('library')}
-          onSelect={(album) => {
+          category={homeCategory}
+          onSelectCategory={setHomeCategory}
+          albumGenre={albumGenre}
+          onSelectAlbumGenre={setAlbumGenre}
+          artistGenre={artistGenre}
+          onSelectArtistGenre={setArtistGenre}
+          recentSongs={recentSongs}
+          onSelectAlbum={(album) => {
+            setDetailsReturnScreen('home');
             setSelectedAlbumId(album.id);
             setScreen('details');
           }}
+          onSelectArtist={(artist) => {
+            setSelectedArtist(artist);
+            setScreen('artistDetails');
+          }}
+          onSelectSong={openSongAlbum}
+          onOpenLibrary={() => setScreen('library')}
+          onAddAlbum={() => openAlbumForm()}
         />
       )}
       {screen === 'library' && (
         <AlbumList
           albums={albums}
+          selectedGenre={albumGenre}
+          onSelectGenre={setAlbumGenre}
           onAdd={() => openAlbumForm()}
           onSelect={(album) => {
             setDeleteRequest(null);
+            setDetailsReturnScreen('library');
             setSelectedAlbumId(album.id);
             setScreen('details');
           }}
@@ -261,18 +330,39 @@ export default function App() {
           }}
         />
       )}
+      {screen === 'artistDetails' && selectedArtist && (
+        <ArtistDetails
+          artist={selectedArtist}
+          albums={artistAlbums}
+          onBack={() => setScreen('home')}
+          onSelectAlbum={(album) => {
+            setDetailsReturnScreen('artistDetails');
+            setSelectedAlbumId(album.id);
+            setScreen('details');
+          }}
+          onSelectSong={openSongAlbum}
+        />
+      )}
       {screen === 'details' && selectedAlbum && (
         <AlbumDetails
           album={selectedAlbum}
+          backLabel={
+            detailsReturnScreen === 'artistDetails'
+              ? '‹ Voltar para o artista'
+              : detailsReturnScreen === 'library'
+                ? '‹ Voltar para a biblioteca'
+                : '‹ Voltar para os álbuns'
+          }
           onBack={() => {
             setDeleteRequest(null);
-            setScreen('library');
+            setScreen(detailsReturnScreen);
           }}
           onEditAlbum={() => openAlbumForm(selectedAlbum)}
           onDeleteAlbum={() => setDeleteRequest({ type: 'album', id: selectedAlbum.id, title: selectedAlbum.title })}
           onAddSong={() => openSongForm()}
           onEditSong={openSongForm}
           onDeleteSong={(song) => setDeleteRequest({ type: 'song', id: song.id, title: song.title })}
+          onSongClick={(song) => recordSongClick(selectedAlbum, song)}
           deleteRequest={deleteRequest}
           onConfirmDelete={confirmDeletion}
           onCancelDelete={() => setDeleteRequest(null)}

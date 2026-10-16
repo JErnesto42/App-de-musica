@@ -6,11 +6,13 @@ import BrandHeader from './BrandHeader';
 export default function AlbumDetails({
   album,
   onBack,
+  backLabel,
   onEditAlbum,
   onDeleteAlbum,
   onAddSong,
   onEditSong,
   onDeleteSong,
+  onSongClick,
   deleteRequest,
   onConfirmDelete,
   onCancelDelete,
@@ -19,7 +21,7 @@ export default function AlbumDetails({
     <ScrollView style={styles.screen} contentContainerStyle={styles.scrollContent}>
       <BrandHeader />
       <Pressable onPress={onBack} hitSlop={10} style={{ marginBottom: 18 }}>
-        <Text style={styles.backLink}>‹ Voltar para os álbuns</Text>
+        <Text style={styles.backLink}>{backLabel}</Text>
       </Pressable>
 
       <View style={styles.detailCard}>
@@ -82,10 +84,15 @@ export default function AlbumDetails({
         ) : album.songs.map((song, index) => (
           <View key={song.id} style={styles.trackRow}>
             <Text style={styles.trackNumber}>{String(index + 1).padStart(2, '0')}</Text>
-            <View style={styles.trackInfo}>
+            <Pressable
+              style={styles.trackInfo}
+              onPress={() => onSongClick(song)}
+              accessibilityRole="button"
+              accessibilityLabel={`Marcar ${song.title} como recente`}
+            >
               <Text style={styles.trackTitle}>{song.title}</Text>
               {song.composer ? <Text style={styles.trackComposer}>{song.composer}</Text> : null}
-            </View>
+            </Pressable>
             <Text style={styles.trackDuration}>{song.duration}</Text>
             <Pressable onPress={() => onEditSong(song)} accessibilityLabel={`Editar ${song.title}`}>
               <Text style={styles.trackAction}>✎</Text>

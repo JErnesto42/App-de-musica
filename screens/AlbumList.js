@@ -1,9 +1,7 @@
 import React from 'react';
-import { FlatList, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, Text, View } from 'react-native';
 import { styles } from './theme';
 import BrandHeader from './BrandHeader';
-
-const logo = require('../assets/logo-sonora.png');
 
 function AlbumCard({ album, onPress }) {
   return (
@@ -32,105 +30,22 @@ function AlbumCard({ album, onPress }) {
 
 export default function AlbumList({
   albums,
-  home,
-  onOpenLibrary,
   onAdd,
   onSelect,
   onHome,
   selectedGenre,
   onSelectGenre,
 }) {
-  if (home) {
-    const genres = [...new Set(albums.map((album) => album.genre).filter(Boolean))];
-    const filteredAlbums = selectedGenre
-      ? albums.filter((album) => album.genre === selectedGenre)
-      : albums;
-
-    return (
-      <ScrollView style={styles.screen} contentContainerStyle={styles.homeContent}>
-        <View style={styles.homeTopBar}>
-          <BrandHeader />
-          <Text style={styles.homeGreeting}>SUA BIBLIOTECA MUSICAL</Text>
-        </View>
-        <View style={styles.heroCard}>
-          <View style={styles.heroGlow} />
-          <Text style={styles.heroEyebrow}>Sua trilha, do seu jeito</Text>
-          <Text style={styles.heroTitle}>Música boa{'\n'}mora aqui.</Text>
-          <Text style={styles.heroDescription}>
-            Organize seus álbuns e deixe cada lembrança no ritmo certo.
-          </Text>
-          <Pressable style={styles.button} onPress={onOpenLibrary}>
-            <Text style={styles.buttonText}>Abrir minha biblioteca</Text>
-          </Pressable>
-          <Text style={styles.heroNote}>
-            {albums.length} {albums.length === 1 ? 'álbum na coleção' : 'álbuns na coleção'}
-          </Text>
-          <Text style={styles.heroMusicNote}>♫</Text>
-        </View>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {selectedGenre ? `Álbuns: ${selectedGenre}` : 'Adicionados recentemente'}
-          </Text>
-          <Pressable onPress={onOpenLibrary}><Text style={styles.textLink}>Ver biblioteca</Text></Pressable>
-        </View>
-        {filteredAlbums.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>
-              {selectedGenre ? 'Nenhum álbum neste gênero' : 'Sua coleção começa aqui'}
-            </Text>
-            <Text style={styles.emptyText}>
-              {selectedGenre
-                ? `Adicione um álbum com o gênero ${selectedGenre} para vê-lo aqui.`
-                : 'Adicione um álbum para organizar suas músicas.'}
-            </Text>
-          </View>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentAlbums}>
-            {filteredAlbums.slice(0, 5).map((album) => (
-              <Pressable key={album.id} style={styles.recentAlbum} onPress={() => onSelect(album)}>
-                <View style={styles.recentCover}>
-                  {album.coverImage
-                    ? <Image source={{ uri: album.coverImage }} style={styles.coverImage} />
-                    : <Image source={logo} style={styles.recentCoverLogo} />}
-                </View>
-                <Text style={styles.recentAlbumTitle} numberOfLines={1}>{album.title}</Text>
-                <Text style={styles.recentAlbumArtist} numberOfLines={1}>{album.artist}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        )}
-        <Text style={[styles.sectionTitle, styles.categoryHeading]}>Explore por gênero</Text>
-        <View style={styles.categoryList}>
-          {[{ label: 'Todos', value: null }, ...genres.map((genre) => ({ label: genre, value: genre }))]
-            .map(({ label, value }) => {
-              const isSelected = selectedGenre === value;
-              return (
-                <Pressable
-                  key={label}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                  onPress={() => onSelectGenre(value)}
-                  style={({ pressed }) => [
-                    styles.categoryChip,
-                    isSelected && styles.categoryChipSelected,
-                    pressed && styles.categoryChipPressed,
-                  ]}
-                >
-                  <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}>
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-        </View>
-      </ScrollView>
-    );
-  }
+  const genres = [...new Set(albums.map((album) => album.genre).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const filteredAlbums = selectedGenre
+    ? albums.filter((album) => album.genre === selectedGenre)
+    : albums;
 
   return (
     <View style={styles.screen}>
       <FlatList
-        data={albums}
+        data={filteredAlbums}
         keyExtractor={(album) => album.id}
         renderItem={({ item }) => <AlbumCard album={item} onPress={() => onSelect(item)} />}
         contentContainerStyle={styles.scrollContent}
@@ -149,13 +64,43 @@ export default function AlbumList({
                 <Text style={styles.buttonText}>＋ Adicionar álbum</Text>
               </Pressable>
             </View>
+            <Text style={[styles.sectionTitle, styles.categoryHeading]}>Filtrar por gênero</Text>
+            <View style={styles.categoryList}>
+              {[{ label: 'Todos', value: null }, ...genres.map((genre) => ({ label: genre, value: genre }))]
+                .map(({ label, value }) => {
+                  const isSelected = selectedGenre === value;
+                  return (
+                    <Pressable
+                      key={label}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => onSelectGenre(value)}
+                      style={({ pressed }) => [
+                        styles.categoryChip,
+                        isSelected && styles.categoryChipSelected,
+                        pressed && styles.categoryChipPressed,
+                      ]}
+                    >
+                      <Text style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}>
+                        {label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+            </View>
           </View>
         )}
         ListEmptyComponent={(
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>♫</Text>
-            <Text style={styles.emptyTitle}>Sua coleção começa aqui</Text>
-            <Text style={styles.emptyText}>Adicione um álbum para começar a organizar suas músicas.</Text>
+            <Text style={styles.emptyTitle}>
+              {selectedGenre ? 'Nenhum álbum neste gênero' : 'Sua coleção começa aqui'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {selectedGenre
+                ? `Escolha outro gênero ou adicione um álbum de ${selectedGenre}.`
+                : 'Adicione um álbum para começar a organizar suas músicas.'}
+            </Text>
           </View>
         )}
       />
