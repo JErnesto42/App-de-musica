@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 import AlbumList from './screens/AlbumList';
 import AlbumDetails from './screens/AlbumDetails';
 import RecordForm from './screens/RecordForm';
@@ -33,9 +35,30 @@ const initialAlbums = [
   },
 ];
 
+const albumsStorageKey = 'sonora.albums.v1';
+
+function loadAlbums() {
+  if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return initialAlbums;
+
+  try {
+    const savedAlbums = localStorage.getItem(albumsStorageKey);
+    if (!savedAlbums) return initialAlbums;
+
+    const parsedAlbums = JSON.parse(savedAlbums);
+    if (!Array.isArray(parsedAlbums)) {
+      throw new Error('Os dados salvos dos álbuns não estão no formato esperado.');
+    }
+    return parsedAlbums;
+  } catch (error) {
+    console.error('Não foi possível carregar os álbuns salvos:', error);
+    return initialAlbums;
+  }
+}
+
 export default function App() {
-  const [albums, setAlbums] = useState(initialAlbums);
+  const [albums, setAlbums] = useState(loadAlbums);
   const [screen, setScreen] = useState('home');
+  const [selectedGenre, setSelectedGenre] = useState(null);
   const [selectedAlbumId, setSelectedAlbumId] = useState(null);
   const [formType, setFormType] = useState('album');
   const [editingId, setEditingId] = useState(null);
@@ -43,6 +66,15 @@ export default function App() {
   const [formReturnScreen, setFormReturnScreen] = useState('library');
   const [formError, setFormError] = useState('');
   const [deleteRequest, setDeleteRequest] = useState(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(albumsStorageKey, JSON.stringify(albums));
+    } catch (error) {
+      console.error('Não foi possível salvar os álbuns no armazenamento do navegador:', error);
+    }
+  }, [albums]);
 
   const selectedAlbum = albums.find((album) => album.id === selectedAlbumId);
 
@@ -168,7 +200,28 @@ export default function App() {
         quality: 0.85,
       });
       if (!result.canceled && result.assets?.[0]) {
-        setFormValues((current) => ({ ...current, coverImage: result.assets[0].uri }));
+        const asset = result.assets[0];
+        const imageContext = ImageManipulator.ImageManipulator.manipulate(asset.uri);
+        imageContext.resize({ width: Math.min(asset.width || 600, 600) });
+        const resizedImage = await imageContext.renderAsync();
+        let compressedImage;
+        try {
+          compressedImage = await resizedImage.saveAsync({
+            format: ImageManipulator.SaveFormat.JPEG,
+            compress: 0.7,
+            base64: true,
+          });
+        } finally {
+          imageContext.release();
+          resizedImage.release();
+        }
+        if (!compressedImage.base64) {
+          throw new Error('A imagem comprimida não retornou os dados necessários para salvá-la.');
+        }
+        setFormValues((current) => ({
+          ...current,
+          coverImage: `data:image/jpeg;base64,${compressedImage.base64}`,
+        }));
         setFormError('');
       }
     } catch (error) {
@@ -184,6 +237,8 @@ export default function App() {
         <AlbumList
           albums={albums}
           home
+          selectedGenre={selectedGenre}
+          onSelectGenre={setSelectedGenre}
           onOpenLibrary={() => setScreen('library')}
           onSelect={(album) => {
             setSelectedAlbumId(album.id);

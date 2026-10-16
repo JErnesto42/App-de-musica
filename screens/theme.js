@@ -261,16 +261,28 @@ export const styles = StyleSheet.create({
   },
   categoryChip: {
     backgroundColor: colors.surfaceRaised,
-    borderColor: colors.border,
-    borderRadius: 10,
+    borderColor: '#3A3150',
+    borderRadius: 20,
     borderWidth: 1,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
+    minHeight: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 9,
+  },
+  categoryChipSelected: {
+    backgroundColor: colors.accentDark,
+    borderColor: colors.accent,
+  },
+  categoryChipPressed: {
+    opacity: 0.75,
   },
   categoryChipText: {
-    color: colors.accentLight,
+    color: colors.muted,
     fontSize: 12,
     fontWeight: '700',
+  },
+  categoryChipTextSelected: {
+    color: colors.text,
   },
   libraryToolbar: {
     alignItems: 'center',
